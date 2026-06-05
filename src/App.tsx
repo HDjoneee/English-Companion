@@ -71,6 +71,7 @@ import type {
   ScenarioId,
   StoredSession,
   ToastMessage,
+  TranscriptionMode,
   TurnAnalysis,
   TurnScores,
   VoiceAccent
@@ -96,6 +97,13 @@ const accentLabels: Record<VoiceAccent, string> = {
   "en-AU": "澳式英语"
 };
 
+const transcriptionModeLabels: Record<TranscriptionMode, string> = {
+  auto: "自动选择",
+  cloud: "稳定云端转写",
+  browser: "浏览器实时转写",
+  recording: "仅录音回放"
+};
+
 export default function App() {
   const [scenarioId, setScenarioId] = useState<ScenarioId>("interview");
   const [difficulty, setDifficulty] = useState<Difficulty>("b1");
@@ -110,6 +118,7 @@ export default function App() {
   const [autoSpeak, setAutoSpeak] = useState(true);
   const [autoListen, setAutoListen] = useState(false);
   const [highAccuracy, setHighAccuracy] = useState(true);
+  const [transcriptionMode, setTranscriptionMode] = useState<TranscriptionMode>("auto");
   const [voiceAccent, setVoiceAccent] = useState<VoiceAccent>("en-US");
   const [voiceRate, setVoiceRate] = useState(1);
   const [selectedVoiceURI, setSelectedVoiceURI] = useState("");
@@ -146,7 +155,7 @@ export default function App() {
       }),
     [analyses, difficulty, elapsedSec, scenario]
   );
-  const { voiceState, start: startVoiceInput, stop: stopVoiceInput } = useSpeechInput();
+  const { voiceState, start: startVoiceInput, stop: stopVoiceInput } = useSpeechInput({ transcriptionMode });
   const { voices, groupedVoices, isSpeaking, speak, stopSpeaking } = useSpeechSynthesis();
 
   useEffect(() => {
@@ -457,6 +466,8 @@ export default function App() {
             setAutoSpeak={setAutoSpeak}
             autoListen={autoListen}
             setAutoListen={setAutoListen}
+            transcriptionMode={transcriptionMode}
+            setTranscriptionMode={setTranscriptionMode}
           />
           <HistoryPanel sessions={sessions} onRestart={restartFromHistory} onDelete={removeHistory} />
         </aside>
@@ -538,6 +549,7 @@ export default function App() {
           setCustomVocabularyText={setCustomVocabularyText}
           speechSupported={voiceState.isSupported}
           secureContext={voiceState.isSecureContext}
+          cloudAvailable={voiceState.cloudAvailable}
           voices={voices}
         />
       ) : null}
@@ -614,7 +626,9 @@ function VoiceSettings({
   autoSpeak,
   setAutoSpeak,
   autoListen,
-  setAutoListen
+  setAutoListen,
+  transcriptionMode,
+  setTranscriptionMode
 }: {
   voiceAccent: VoiceAccent;
   setVoiceAccent: (accent: VoiceAccent) => void;
@@ -627,6 +641,8 @@ function VoiceSettings({
   setAutoSpeak: (checked: boolean) => void;
   autoListen: boolean;
   setAutoListen: (checked: boolean) => void;
+  transcriptionMode: TranscriptionMode;
+  setTranscriptionMode: (mode: TranscriptionMode) => void;
 }) {
   return (
     <Card>
@@ -665,6 +681,25 @@ function VoiceSettings({
             <span>{voiceRate.toFixed(1)}x</span>
           </div>
           <Slider min={0.5} max={2} step={0.1} value={voiceRate} onChange={(event) => setVoiceRate(Number(event.target.value))} />
+        </div>
+        <div className="grid gap-2">
+          <label className="text-xs font-medium text-slate-500" htmlFor="transcriptionMode">
+            转写模式
+          </label>
+          <Select
+            id="transcriptionMode"
+            value={transcriptionMode}
+            onChange={(event) => setTranscriptionMode(event.target.value as TranscriptionMode)}
+          >
+            {Object.entries(transcriptionModeLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </Select>
+          <p className="text-xs leading-[1.4] text-slate-500">
+            自动模式会优先使用稳定云端分片转写；未配置时才退回浏览器转写。
+          </p>
         </div>
         <div className="grid gap-3">
           <ToggleLine label="语音播放" checked={autoSpeak} onChange={setAutoSpeak} />
@@ -1105,6 +1140,7 @@ function SettingsPanel({
   setCustomVocabularyText,
   speechSupported,
   secureContext,
+  cloudAvailable,
   voices
 }: {
   onClose: () => void;
@@ -1114,6 +1150,7 @@ function SettingsPanel({
   setCustomVocabularyText: (value: string) => void;
   speechSupported: boolean;
   secureContext: boolean;
+  cloudAvailable: boolean | null;
   voices: SpeechSynthesisVoice[];
 }) {
   return (
@@ -1137,6 +1174,11 @@ function SettingsPanel({
           </CardHeader>
           <CardContent className="grid gap-3 text-sm">
             <DiagnosticLine label="安全上下文" ok={secureContext} help="麦克风需要 HTTPS 或 localhost。" />
+            <DiagnosticLine
+              label="稳定云端 ASR"
+              ok={cloudAvailable === true}
+              help={cloudAvailable === true ? "已连接 /api/transcribe。" : "设置 OPENAI_API_KEY 后可启用稳定分片转写。"}
+            />
             <DiagnosticLine label="实时转写 API" ok={speechSupported} help="Chrome / Edge 支持更稳定。" />
             <DiagnosticLine label="可用朗读语音" ok={voices.length > 0} help={`${voices.length} 个 voice 已加载。`} />
           </CardContent>

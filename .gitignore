@@ -3,6 +3,7 @@ dist/
 .vite/
 .env
 .env.*
+!.env.example
 *.local
 *.log
 npm-debug.log*

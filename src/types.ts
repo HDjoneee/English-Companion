@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 
 export type Difficulty = "a2" | "b1" | "b2";
 export type ScenarioId = "interview" | "dining" | "meeting" | "travel";
+export type TranscriptionMode = "auto" | "cloud" | "browser" | "recording";
 export type VoiceAccent = "en-US" | "en-GB" | "en-AU";
 export type MessageRole = "coach" | "user" | "system";
 
@@ -89,6 +90,8 @@ export interface VoiceState {
   isSecureContext: boolean;
   isListening: boolean;
   isRecording: boolean;
+  transcriptionProvider: Exclude<TranscriptionMode, "auto">;
+  cloudAvailable: boolean | null;
   status: string;
   interimTranscript: string;
   finalTranscript: string;
