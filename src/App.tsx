@@ -275,7 +275,7 @@ export default function App() {
   }
 
   function persistSession(nextMessages: DialogueMessage[], nextAnalyses: TurnAnalysis[]) {
-    if (!nextAnalyses.length) return;
+    if (!nextMessages.some((message) => message.role === "user")) return;
     const stored: StoredSession = {
       id: sessionIdRef.current,
       title: `${scenario.title} · ${new Date().toLocaleString()}`,
@@ -285,10 +285,71 @@ export default function App() {
       durationSec: elapsedSec,
       messages: nextMessages,
       analyses: nextAnalyses,
-      averageScore: aggregateScores(nextAnalyses).overall
+      averageScore: nextAnalyses.length ? aggregateScores(nextAnalyses).overall : 0
     };
     saveSession(stored);
     setSessions(loadSessions());
+  }
+
+  async function submitVoiceOnlyTurn(audio: { audioUrl?: string | null; durationSec?: number; recognitionUnavailable?: boolean }) {
+    const sessionWasInactive = !active;
+    const baseMessages = sessionWasInactive ? [createMessage("coach", scenario.role, scenario.opening)] : messages;
+    if (sessionWasInactive) {
+      setActive(true);
+      setStartedAt(Date.now());
+      setCoachPrompt(scenario.opening);
+    }
+
+    const userMessage = createMessage("user", "You", "Voice answer recorded. Transcript unavailable.", {
+      audioUrl: audio.audioUrl ?? undefined,
+      durationSec: audio.durationSec
+    });
+    const localResponse = buildVoiceOnlyCoachResponse(scenario, difficulty, getUserTurnCount(baseMessages));
+    const aiTurn = await requestAiCoachTurn({
+      scenario: {
+        title: scenario.title,
+        role: scenario.role,
+        brief: scenario.brief,
+        keywords: scenario.keywords,
+        phrases: scenario.phrases
+      },
+      difficulty,
+      userText:
+        "The learner gave a spoken English answer, but automatic transcription is unavailable. Continue the role-play naturally without asking them to type.",
+      localScore: 0,
+      localIssues: [],
+      history: baseMessages
+        .filter((message) => message.role === "coach" || message.role === "user")
+        .slice(-8)
+        .map((message) => ({ role: message.role as "coach" | "user", text: message.text }))
+    });
+    const response = aiTurn.coachResponse?.trim() || localResponse;
+    const coachMessage = createMessage("coach", scenario.role, response);
+    const nextMessages = [...baseMessages, userMessage, coachMessage];
+
+    setMessages(nextMessages);
+    setCoachPrompt(response);
+    setTextValue("");
+    persistSession(nextMessages, analyses);
+
+    if (autoSpeak) {
+      speak(response, {
+        accent: voiceAccent,
+        rate: voiceRate,
+        voiceURI: selectedVoiceURI,
+        onEnd: () => {
+          if (autoListen) void handleVoiceStart();
+        }
+      });
+    }
+
+    pushToast({
+      type: "info",
+      title: "已自动进入下一轮",
+      description: audio.recognitionUnavailable
+        ? "转写暂不可用，但录音已保存，可回放；对话会继续进行。"
+        : "未识别到文字，但录音已保存，可回放；对话会继续进行。"
+    });
   }
 
   async function submitUserTurn(text: string, audio?: { audioUrl?: string | null; confidence?: number | null; durationSec?: number }) {
@@ -321,7 +382,7 @@ export default function App() {
       analysis,
       scenario,
       difficulty,
-      turnIndex: analyses.length
+      turnIndex: getUserTurnCount(baseMessages)
     });
     const aiTurn = await requestAiCoachTurn({
       scenario: {
@@ -391,12 +452,10 @@ export default function App() {
           durationSec: payload.durationSec
         });
       } else if (payload.audioUrl) {
-        pushToast({
-          type: payload.recognitionUnavailable ? "info" : "warning",
-          title: payload.recognitionUnavailable ? "已切换为录音模式" : "已录音，但未识别到文字",
-          description: payload.recognitionUnavailable
-            ? "浏览器实时转写服务不稳定，本次录音已保留。请在输入框补充英文文本后继续评分。"
-            : "可以先回放自己的声音，再用文本框输入回答继续评分。"
+        void submitVoiceOnlyTurn({
+          audioUrl: payload.audioUrl,
+          durationSec: payload.durationSec,
+          recognitionUnavailable: payload.recognitionUnavailable
         });
       }
     });
@@ -508,7 +567,7 @@ export default function App() {
             active={active}
             scenario={scenario}
             coachPrompt={typedCoachPrompt}
-            turn={analyses.length}
+            turn={getUserTurnCount(messages)}
             isSpeaking={isSpeaking}
             isRecording={voiceState.isRecording}
             voiceStatus={voiceState.status}
@@ -580,6 +639,16 @@ export default function App() {
       ) : null}
     </div>
   );
+}
+
+function getUserTurnCount(messages: DialogueMessage[]) {
+  return messages.filter((message) => message.role === "user").length;
+}
+
+function buildVoiceOnlyCoachResponse(scenario: Scenario, difficulty: Difficulty, turnIndex: number) {
+  const prompts = scenario.prompts[difficulty] || scenario.prompts.b1;
+  const nextPrompt = prompts[turnIndex % prompts.length];
+  return `Thanks, I received your spoken answer. I'll keep the conversation moving even though transcription is unavailable right now. ${nextPrompt}`;
 }
 
 function ScenarioPanel({
