@@ -36,6 +36,7 @@ import { Switch } from "./components/ui/switch";
 import { Textarea } from "./components/ui/textarea";
 import { useSpeechInput } from "./hooks/useSpeechInput";
 import { useSpeechSynthesis } from "./hooks/useSpeechSynthesis";
+import { requestAiCoachTurn } from "./lib/aiCoach";
 import {
   aggregateScores,
   analyzeUtterance,
@@ -290,7 +291,7 @@ export default function App() {
     setSessions(loadSessions());
   }
 
-  function submitUserTurn(text: string, audio?: { audioUrl?: string | null; confidence?: number | null; durationSec?: number }) {
+  async function submitUserTurn(text: string, audio?: { audioUrl?: string | null; confidence?: number | null; durationSec?: number }) {
     const cleanText = text.trim();
     if (!cleanText) return;
 
@@ -316,12 +317,36 @@ export default function App() {
       audioUrl: audio?.audioUrl ?? undefined,
       durationSec: audio?.durationSec
     });
-    const response = buildCoachResponse({
+    const localResponse = buildCoachResponse({
       analysis,
       scenario,
       difficulty,
       turnIndex: analyses.length
     });
+    const aiTurn = await requestAiCoachTurn({
+      scenario: {
+        title: scenario.title,
+        role: scenario.role,
+        brief: scenario.brief,
+        keywords: scenario.keywords,
+        phrases: scenario.phrases
+      },
+      difficulty,
+      userText: cleanText,
+      localScore: analysis.scores.overall,
+      localIssues: analysis.issues.map((issue) => ({
+        type: issue.type,
+        title: issue.title,
+        original: issue.original,
+        replacement: issue.replacement,
+        reason: issue.reason
+      })),
+      history: baseMessages
+        .filter((message) => message.role === "coach" || message.role === "user")
+        .slice(-8)
+        .map((message) => ({ role: message.role as "coach" | "user", text: message.text }))
+    });
+    const response = aiTurn.coachResponse?.trim() || localResponse;
     const coachMessage = createMessage("coach", scenario.role, response);
     const nextMessages = [...baseMessages, userMessage, coachMessage];
     const nextAnalyses = [...analyses, analysis];
@@ -360,7 +385,7 @@ export default function App() {
     stopSpeaking();
     const ok = await startVoiceInput((payload) => {
       if (payload.transcript.trim()) {
-        submitUserTurn(payload.transcript, {
+        void submitUserTurn(payload.transcript, {
           audioUrl: payload.audioUrl,
           confidence: payload.confidence,
           durationSec: payload.durationSec
@@ -386,7 +411,7 @@ export default function App() {
 
   function handleTextSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    submitUserTurn(textValue);
+    void submitUserTurn(textValue);
   }
 
   function toggleFavorite(id: string) {

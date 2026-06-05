@@ -1,6 +1,6 @@
 # AI 英语口语陪练
 
-React 18 + TypeScript + Tailwind CSS + Shadcn UI 风格组件实现的英语口语练习工具。支持场景对话、语音输入、稳定分片转写、用户录音回放、发音/流利度/语法/表达评分、纠错改写、课后总结、历史练习、收藏、错题本、文本和 PDF 导出。
+React 18 + TypeScript + Tailwind CSS + Shadcn UI 风格组件实现的英语口语练习工具。支持场景对话、MiniMax 大模型追问、语音输入、稳定分片转写、用户录音回放、发音/流利度/语法/表达评分、纠错改写、课后总结、历史练习、收藏、错题本、文本和 PDF 导出。
 
 ## 运行
 
@@ -45,6 +45,22 @@ npm.cmd run dev
 
 应用左侧「语音设置」里的「转写模式」建议保持「自动选择」。自动模式会优先使用稳定云端分片转写；没有配置 `OPENAI_API_KEY` 时，才退回浏览器实时转写或录音回放模式。
 
+## MiniMax 大模型配置
+
+MiniMax 用于生成更自然的 AI 追问和表达建议。API Key 只放在本地 `.env`，不要提交到 GitHub。
+
+```text
+MINIMAX_API_KEY=你的_MiniMax_API_Key
+MINIMAX_CHAT_MODEL=MiniMax-M3
+```
+
+本地开发服务会提供：
+
+- `GET /api/coach-turn/health`：检查 MiniMax 是否已配置。
+- `POST /api/coach-turn`：把用户回答、场景、历史上下文和本地评分发送给 MiniMax，生成下一轮英文追问和中文表达建议。
+
+如果没有配置 `MINIMAX_API_KEY`，应用会自动回退到本地追问逻辑。
+
 ## 麦克风与转写说明
 
 语音链路会先调用 `navigator.mediaDevices.getUserMedia` 请求麦克风权限并启动 `MediaRecorder`。这样即使浏览器实时转写不可用，仍可录制并回放用户自己的语音。
@@ -75,6 +91,7 @@ npm.cmd run dev
 ## 代码结构
 
 - `src/App.tsx`：主应用与业务编排。
+- `src/lib/aiCoach.ts`：MiniMax 大模型追问接口封装。
 - `src/hooks/useSpeechInput.ts`：麦克风、录音、分片转写、浏览器转写兜底和错误诊断。
 - `src/hooks/useSpeechSynthesis.ts`：AI 朗读、口音和语速控制。
 - `vite.config.ts`：Vite 配置及本地 `/api/transcribe` 转写接口。
