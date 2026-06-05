@@ -434,8 +434,8 @@ export default function App() {
       <TopNav onOpenSettings={() => setShowSettings(true)} />
       <ToastStack items={toasts} onDismiss={dismissToast} />
 
-      <main className="mx-auto grid w-[min(1480px,calc(100vw-32px))] gap-4 py-6 lg:grid-cols-[20%_55%_25%]">
-        <aside className="grid content-start gap-4">
+      <main className="mx-auto grid w-[min(1480px,calc(100vw-32px))] gap-5 py-7 lg:grid-cols-[20%_55%_25%]">
+        <aside className="grid content-start gap-5">
           <ScenarioPanel
             activeScenario={scenario}
             difficulty={difficulty}
@@ -461,7 +461,7 @@ export default function App() {
           <HistoryPanel sessions={sessions} onRestart={restartFromHistory} onDelete={removeHistory} />
         </aside>
 
-        <section className="grid content-start gap-4">
+        <section className="grid content-start gap-5">
           <SessionMetrics
             scenario={scenario}
             elapsedSec={elapsedSec}
@@ -489,7 +489,7 @@ export default function App() {
             conversationEndRef={conversationEndRef}
             canShowSummary={analyses.length > 0}
           />
-          <form ref={formRef} onSubmit={handleTextSubmit} className="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 shadow-soft sm:grid-cols-[1fr_auto]">
+          <form ref={formRef} onSubmit={handleTextSubmit} className="grid gap-2 rounded-xl border border-slate-200/80 bg-white p-3 shadow-card sm:grid-cols-[1fr_auto]">
             <Input
               value={textValue}
               onChange={(event) => setTextValue(event.target.value)}
@@ -503,7 +503,7 @@ export default function App() {
           </form>
         </section>
 
-        <aside className="grid content-start gap-4">
+        <aside className="grid content-start gap-5">
           <FeedbackPanel
             aggregate={aggregate}
             latestAnalysis={latestAnalysis}
@@ -572,11 +572,11 @@ function ScenarioPanel({
               type="button"
               onClick={() => onScenarioChange(item.id)}
               className={cn(
-                "group grid grid-cols-[36px_1fr] gap-3 rounded-lg border bg-white p-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-soft",
-                selected ? "border-2 border-sky-500 bg-sky-50 shadow-soft" : "border-slate-200"
+                "group grid grid-cols-[36px_1fr] gap-3 rounded-xl border bg-white p-3.5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-hover",
+                selected ? "border-sky-400 bg-gradient-to-br from-sky-50 to-white shadow-soft ring-1 ring-sky-400/30" : "border-slate-200/80 hover:border-slate-300"
               )}
             >
-              <span className={cn("grid h-9 w-9 place-items-center rounded-full", selected ? "bg-sky-500 text-white" : "bg-slate-100 text-slate-500")}>
+              <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-xl transition-all", selected ? "bg-gradient-to-br from-sky-500 to-sky-600 text-white shadow-soft" : "bg-slate-100 text-slate-400 group-hover:bg-slate-200")}>
                 <Icon className="h-4 w-4" />
               </span>
               <span>
@@ -707,7 +707,7 @@ function HistoryPanel({
       <CardContent className="grid max-h-72 gap-2 overflow-auto scrollbar-thin">
         {sessions.length ? (
           sessions.map((session) => (
-            <div key={session.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div key={session.id} className="rounded-xl border border-slate-200/80 bg-gradient-to-br from-slate-50 to-white p-3.5 transition-shadow hover:shadow-soft">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-slate-800">{session.title}</p>
@@ -754,9 +754,9 @@ function SessionMetrics({
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
       {items.map(([label, value]) => (
-        <Card key={label} className="p-4">
-          <span className="text-xs font-medium leading-[1.4] text-slate-500">{label}</span>
-          <strong className="mt-1 block text-xl font-semibold text-slate-900">{value}</strong>
+        <Card key={label} className="p-4 transition-shadow hover:shadow-hover">
+          <span className="text-xs font-medium tracking-wide text-slate-400">{label}</span>
+          <strong className="mt-1.5 block text-2xl font-bold text-slate-900">{value}</strong>
         </Card>
       ))}
     </div>
@@ -806,7 +806,7 @@ function ConversationCard({
 }) {
   return (
     <Card className="overflow-hidden">
-      <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-slate-900 to-slate-800 text-white">
+      <CardHeader className="border-b border-white/10 bg-gradient-to-br from-slate-900 via-slate-800 to-sky-900 text-white">
         <div className="grid gap-4 sm:grid-cols-[auto_1fr]">
           <div className="grid place-items-center">
             <Waveform active={isRecording || isSpeaking} danger={isRecording} />
@@ -825,7 +825,7 @@ function ConversationCard({
         </div>
       </CardHeader>
       <CardContent className="grid gap-4 p-4">
-        <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <div className="grid gap-3 rounded-xl border border-slate-200/80 bg-gradient-to-br from-slate-50 to-white p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <p className="text-sm font-semibold text-slate-900">实时转写</p>
@@ -895,7 +895,7 @@ function DialogueBubble({
   return (
     <article className={cn("animate-message-in flex gap-3", isUser ? "justify-end" : "justify-start")}>
       {!isUser ? <Avatar label="AI" tone="ai" /> : null}
-      <div className={cn("max-w-[82%] rounded-lg border p-3 shadow-sm", isUser ? "border-sky-100 bg-sky-50" : "border-slate-200 bg-white")}>
+      <div className={cn("max-w-[82%] rounded-xl border p-3.5 shadow-sm transition-shadow", isUser ? "border-sky-100 bg-gradient-to-br from-sky-50 to-white" : "border-slate-200/80 bg-white")}>
         <div className="mb-1 flex items-center justify-between gap-3">
           <span className="text-xs font-medium text-slate-500">{message.speaker}</span>
           <div className="flex items-center gap-1">
@@ -1024,7 +1024,7 @@ function FeedbackPanel({
           {scenario.phrases.map((phrase) => {
             const id = `phrase:${scenario.id}:${phrase}`;
             return (
-              <div key={phrase} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
+              <div key={phrase} className="flex items-center gap-2 rounded-xl border border-slate-200/80 bg-gradient-to-br from-slate-50 to-white p-2.5 transition-all hover:border-sky-200 hover:shadow-soft">
                 <button type="button" className="grid h-8 w-8 place-items-center rounded-full bg-sky-100 text-sky-600 hover:bg-sky-200" onClick={() => onInsertPhrase(phrase)} aria-label="插入表达">
                   <Plus className="h-4 w-4" />
                 </button>
@@ -1066,7 +1066,7 @@ function FeedbackPanel({
           </CardHeader>
           <CardContent className="grid gap-2">
             {repeatedIssues.slice(0, 4).map((issue) => (
-              <div key={issue.title} className="flex items-center justify-between rounded-lg bg-slate-50 p-2 text-xs">
+              <div key={issue.title} className="flex items-center justify-between rounded-xl border border-slate-200/80 bg-gradient-to-br from-slate-50 to-white p-2.5 text-xs">
                 <span className="font-medium text-slate-700">{issue.title}</span>
                 <Badge>{issue.count} 次</Badge>
               </div>
@@ -1080,7 +1080,7 @@ function FeedbackPanel({
 
 function IssueCard({ issue, compact }: { issue: Issue; compact?: boolean }) {
   return (
-    <div className={cn("rounded-lg border p-3", issue.type === "pronunciation" ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-slate-50")}>
+    <div className={cn("rounded-xl border p-3.5", issue.type === "pronunciation" ? "border-amber-200/80 bg-gradient-to-br from-amber-50 to-white" : "border-slate-200/80 bg-gradient-to-br from-slate-50 to-white")}>
       <div className="mb-2 flex items-center justify-between gap-2">
         <strong className="text-sm font-semibold text-slate-900">{issue.title}</strong>
         <Badge className={cn(issue.type === "grammar" ? "text-red-600" : issue.type === "expression" ? "text-sky-600" : "text-amber-600")}>

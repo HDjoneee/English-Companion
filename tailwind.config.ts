@@ -38,13 +38,16 @@ const config = {
         }
       },
       borderRadius: {
-        lg: "8px",
-        md: "7px",
-        sm: "6px"
+        lg: "12px",
+        md: "10px",
+        sm: "8px"
       },
       boxShadow: {
-        soft: "0 4px 20px rgba(0, 0, 0, 0.08)",
-        focus: "0 0 0 4px rgba(14, 165, 233, 0.12)"
+        soft: "0 2px 16px rgba(0, 0, 0, 0.06), 0 1px 4px rgba(0, 0, 0, 0.04)",
+        card: "0 1px 3px rgba(0, 0, 0, 0.05), 0 4px 16px rgba(0, 0, 0, 0.06)",
+        hover: "0 4px 24px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.06)",
+        focus: "0 0 0 3px rgba(14, 165, 233, 0.2)",
+        glow: "0 0 20px rgba(14, 165, 233, 0.25)"
       },
       fontFamily: {
         sans: [
@@ -60,17 +63,22 @@ const config = {
       },
       keyframes: {
         "message-in": {
-          "0%": { opacity: "0", transform: "translateY(8px) scale(0.98)" },
+          "0%": { opacity: "0", transform: "translateY(10px) scale(0.97)" },
           "100%": { opacity: "1", transform: "translateY(0) scale(1)" }
         },
         "wave-flow": {
-          "0%, 100%": { transform: "scaleY(0.3)" },
+          "0%, 100%": { transform: "scaleY(0.25)" },
           "50%": { transform: "scaleY(1)" }
+        },
+        "pulse-ring": {
+          "0%": { transform: "scale(1)", opacity: "1" },
+          "100%": { transform: "scale(1.5)", opacity: "0" }
         }
       },
       animation: {
-        "message-in": "message-in 220ms ease-out both",
-        "wave-flow": "wave-flow 760ms ease-in-out infinite"
+        "message-in": "message-in 250ms cubic-bezier(0.16,1,0.3,1) both",
+        "wave-flow": "wave-flow 800ms ease-in-out infinite",
+        "pulse-ring": "pulse-ring 1.2s ease-out infinite"
       }
     }
   },
