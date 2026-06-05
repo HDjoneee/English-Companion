@@ -11,11 +11,15 @@ interface CompletionPayload {
   confidence: number | null;
   audioUrl: string | null;
   durationSec: number;
+  recognitionUnavailable: boolean;
 }
+
+const isSecureSpeechContext =
+  window.isSecureContext || location.hostname === "localhost" || location.hostname === "127.0.0.1";
 
 const initialState: VoiceState = {
   isSupported: Boolean(window.SpeechRecognition || window.webkitSpeechRecognition),
-  isSecureContext: window.isSecureContext || location.hostname === "localhost" || location.hostname === "127.0.0.1",
+  isSecureContext: isSecureSpeechContext,
   isListening: false,
   isRecording: false,
   status: "待机",
@@ -36,6 +40,7 @@ export function useSpeechInput() {
   const startedAtRef = useRef(0);
   const transcriptRef = useRef("");
   const confidenceRef = useRef<number | null>(null);
+  const speechUnavailableRef = useRef(!initialState.isSupported);
   const completionRef = useRef<((payload: CompletionPayload) => void) | null>(null);
 
   const cleanupStream = useCallback(() => {
@@ -65,15 +70,16 @@ export function useSpeechInput() {
     const recorder = recorderRef.current;
     if (recorder && recorder.state !== "inactive") {
       recorder.stop();
-    } else {
-      cleanupStream();
-      setVoiceState((prev) => ({
-        ...prev,
-        isListening: false,
-        isRecording: false,
-        status: "待机"
-      }));
+      return;
     }
+
+    cleanupStream();
+    setVoiceState((prev) => ({
+      ...prev,
+      isListening: false,
+      isRecording: false,
+      status: "待机"
+    }));
   }, [cleanupStream]);
 
   const abort = useCallback(() => {
@@ -115,7 +121,7 @@ export function useSpeechInput() {
         return false;
       }
 
-      if (!initialState.isSecureContext) {
+      if (!isSecureSpeechContext) {
         setVoiceState((prev) => ({
           ...prev,
           error: "麦克风需要 HTTPS 或 localhost。请通过 npm run dev 的本地地址访问。",
@@ -157,26 +163,40 @@ export function useSpeechInput() {
             durationSec,
             status: transcriptRef.current ? "识别完成" : "录音完成，可回放",
             finalTranscript: transcriptRef.current,
-            confidence: confidenceRef.current
+            confidence: confidenceRef.current,
+            error: null
           }));
           completionRef.current?.({
             transcript: transcriptRef.current,
             confidence: confidenceRef.current,
             audioUrl,
-            durationSec
+            durationSec,
+            recognitionUnavailable: speechUnavailableRef.current
           });
           completionRef.current = null;
         };
         recorder.start();
 
-        const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!Recognition) {
+        if (speechUnavailableRef.current) {
           setVoiceState((prev) => ({
             ...prev,
             isRecording: true,
             isListening: false,
-            status: "正在录音；此浏览器不支持实时转写",
-            error: "Web Speech API 不可用，录音回放仍可使用。"
+            status: "录音模式：说完后输入文字确认",
+            error: null
+          }));
+          return true;
+        }
+
+        const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!Recognition) {
+          speechUnavailableRef.current = true;
+          setVoiceState((prev) => ({
+            ...prev,
+            isRecording: true,
+            isListening: false,
+            status: "录音模式：此浏览器不支持实时转写",
+            error: null
           }));
           return true;
         }
@@ -234,10 +254,27 @@ export function useSpeechInput() {
         };
 
         recognition.onerror = (event: SpeechRecognitionErrorEventLike) => {
-          const message = mapSpeechError(event.error);
+          if (isRecoverableSpeechError(event.error)) {
+            speechUnavailableRef.current = true;
+            try {
+              recognition.abort();
+            } catch {
+              // No-op.
+            }
+            setVoiceState((prev) => ({
+              ...prev,
+              isListening: false,
+              isRecording: true,
+              interimTranscript: "",
+              status: "实时转写不稳定，已切换为录音模式",
+              error: null
+            }));
+            return;
+          }
+
           setVoiceState((prev) => ({
             ...prev,
-            error: message,
+            error: mapSpeechError(event.error),
             status: "识别异常，录音仍在"
           }));
         };
@@ -246,7 +283,11 @@ export function useSpeechInput() {
           setVoiceState((prev) => ({
             ...prev,
             isListening: false,
-            status: prev.isRecording ? "识别暂停，仍在录音" : "待机"
+            status: prev.isRecording
+              ? speechUnavailableRef.current
+                ? "录音模式：说完后输入文字确认"
+                : "识别暂停，仍在录音"
+              : "待机"
           }));
         };
 
@@ -284,6 +325,10 @@ export function useSpeechInput() {
   };
 }
 
+function isRecoverableSpeechError(error: string) {
+  return error === "network" || error === "service-not-allowed" || error === "language-not-supported";
+}
+
 function mapMicrophoneError(error: unknown) {
   if (!(error instanceof DOMException)) return "麦克风调用失败，请检查浏览器权限。";
   if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
@@ -305,7 +350,6 @@ function mapSpeechError(error: string) {
   const map: Record<string, string> = {
     "not-allowed": "语音识别权限被拒绝。请允许麦克风权限后重试。",
     "no-speech": "没有捕捉到语音，请靠近麦克风再试。",
-    network: "浏览器语音识别服务暂时不可用，可先使用文本输入。",
     "audio-capture": "没有检测到麦克风输入。",
     aborted: "语音识别已停止。"
   };

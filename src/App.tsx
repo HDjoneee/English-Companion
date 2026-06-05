@@ -358,9 +358,11 @@ export default function App() {
         });
       } else if (payload.audioUrl) {
         pushToast({
-          type: "warning",
-          title: "已录音，但未识别到文字",
-          description: "可以先回放自己的声音，再用文本框输入回答继续评分。"
+          type: payload.recognitionUnavailable ? "info" : "warning",
+          title: payload.recognitionUnavailable ? "已切换为录音模式" : "已录音，但未识别到文字",
+          description: payload.recognitionUnavailable
+            ? "浏览器实时转写服务不稳定，本次录音已保留。请在输入框补充英文文本后继续评分。"
+            : "可以先回放自己的声音，再用文本框输入回答继续评分。"
         });
       }
     });
