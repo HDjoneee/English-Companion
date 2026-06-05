@@ -40,6 +40,7 @@ import { requestAiCoachTurn } from "./lib/aiCoach";
 import {
   aggregateScores,
   analyzeUtterance,
+  analyzeVoiceOnlyTurn,
   buildCoachResponse,
   buildSessionReport,
   groupIssues
@@ -65,6 +66,7 @@ import {
   scoreTextColor
 } from "./lib/utils";
 import type {
+  AudioMetrics,
   DialogueMessage,
   Difficulty,
   Issue,
@@ -291,7 +293,12 @@ export default function App() {
     setSessions(loadSessions());
   }
 
-  async function submitVoiceOnlyTurn(audio: { audioUrl?: string | null; durationSec?: number; recognitionUnavailable?: boolean }) {
+  async function submitVoiceOnlyTurn(audio: {
+    audioUrl?: string | null;
+    durationSec?: number;
+    recognitionUnavailable?: boolean;
+    audioMetrics?: AudioMetrics | null;
+  }) {
     const sessionWasInactive = !active;
     const baseMessages = sessionWasInactive ? [createMessage("coach", scenario.role, scenario.opening)] : messages;
     if (sessionWasInactive) {
@@ -300,7 +307,15 @@ export default function App() {
       setCoachPrompt(scenario.opening);
     }
 
+    const analysis = analyzeVoiceOnlyTurn({
+      scenario,
+      difficulty,
+      audioMetrics: audio.audioMetrics ?? null,
+      audioUrl: audio.audioUrl ?? undefined,
+      recognitionUnavailable: audio.recognitionUnavailable
+    });
     const userMessage = createMessage("user", "You", "Voice answer recorded. Transcript unavailable.", {
+      score: analysis.scores.overall,
       audioUrl: audio.audioUrl ?? undefined,
       durationSec: audio.durationSec
     });
@@ -316,8 +331,14 @@ export default function App() {
       difficulty,
       userText:
         "The learner gave a spoken English answer, but automatic transcription is unavailable. Continue the role-play naturally without asking them to type.",
-      localScore: 0,
-      localIssues: [],
+      localScore: analysis.scores.overall,
+      localIssues: analysis.issues.map((issue) => ({
+        type: issue.type,
+        title: issue.title,
+        original: issue.original,
+        replacement: issue.replacement,
+        reason: issue.reason
+      })),
       history: baseMessages
         .filter((message) => message.role === "coach" || message.role === "user")
         .slice(-8)
@@ -326,11 +347,13 @@ export default function App() {
     const response = aiTurn.coachResponse?.trim() || localResponse;
     const coachMessage = createMessage("coach", scenario.role, response);
     const nextMessages = [...baseMessages, userMessage, coachMessage];
+    const nextAnalyses = [...analyses, analysis];
 
     setMessages(nextMessages);
+    setAnalyses(nextAnalyses);
     setCoachPrompt(response);
     setTextValue("");
-    persistSession(nextMessages, analyses);
+    persistSession(nextMessages, nextAnalyses);
 
     if (autoSpeak) {
       speak(response, {
@@ -344,11 +367,11 @@ export default function App() {
     }
 
     pushToast({
-      type: "info",
-      title: "已自动进入下一轮",
+      type: analysis.scores.overall >= 75 ? "success" : analysis.scores.overall >= 60 ? "info" : "warning",
+      title: `语音即时反馈 ${analysis.scores.overall}`,
       description: audio.recognitionUnavailable
-        ? "转写暂不可用，但录音已保存，可回放；对话会继续进行。"
-        : "未识别到文字，但录音已保存，可回放；对话会继续进行。"
+        ? "转写暂不可用，本轮已按录音质量、停顿和音量生成反馈，并继续对话。"
+        : "未识别到文字，本轮已按录音质量、停顿和音量生成反馈，并继续对话。"
     });
   }
 
@@ -455,7 +478,8 @@ export default function App() {
         void submitVoiceOnlyTurn({
           audioUrl: payload.audioUrl,
           durationSec: payload.durationSec,
-          recognitionUnavailable: payload.recognitionUnavailable
+          recognitionUnavailable: payload.recognitionUnavailable,
+          audioMetrics: payload.audioMetrics
         });
       }
     });

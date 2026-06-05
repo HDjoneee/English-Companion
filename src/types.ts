@@ -50,6 +50,17 @@ export interface TurnScores {
   overall: number;
 }
 
+export interface AudioMetrics {
+  durationSec: number;
+  speakingSec: number;
+  silenceSec: number;
+  speechRatio: number;
+  averageVolume: number;
+  peakVolume: number;
+  clippingEvents: number;
+  sampleCount: number;
+}
+
 export interface TurnAnalysis {
   id: string;
   text: string;
@@ -63,6 +74,7 @@ export interface TurnAnalysis {
   correctedSentence: string;
   pronunciationTargets: string[];
   audioUrl?: string;
+  audioMetrics?: AudioMetrics;
   createdAt: number;
 }
 
@@ -98,6 +110,7 @@ export interface VoiceState {
   confidence: number | null;
   audioUrl: string | null;
   durationSec: number;
+  audioMetrics: AudioMetrics | null;
   error: string | null;
 }
 

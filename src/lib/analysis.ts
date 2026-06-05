@@ -1,4 +1,4 @@
-import type { Difficulty, Issue, Scenario, TurnAnalysis, TurnScores } from "../types";
+import type { AudioMetrics, Difficulty, Issue, Scenario, TurnAnalysis, TurnScores } from "../types";
 import { average, clamp, createId, tokenize } from "./utils";
 
 interface AnalyzeInput {
@@ -9,6 +9,14 @@ interface AnalyzeInput {
   durationSec: number;
   customVocabulary: string[];
   audioUrl?: string;
+}
+
+interface VoiceOnlyInput {
+  scenario: Scenario;
+  difficulty: Difficulty;
+  audioMetrics: AudioMetrics | null;
+  audioUrl?: string;
+  recognitionUnavailable?: boolean;
 }
 
 interface Rule {
@@ -200,6 +208,137 @@ export function analyzeUtterance(input: AnalyzeInput): TurnAnalysis {
     correctedSentence,
     pronunciationTargets,
     audioUrl: input.audioUrl,
+    createdAt: Date.now()
+  };
+}
+
+export function analyzeVoiceOnlyTurn(input: VoiceOnlyInput): TurnAnalysis {
+  const metrics = input.audioMetrics;
+  const durationSec = Math.max(metrics?.durationSec ?? 0, 0.6);
+  const speechRatio = metrics?.speechRatio ?? 0;
+  const averageVolume = metrics?.averageVolume ?? 0;
+  const peakVolume = metrics?.peakVolume ?? 0;
+  const clippingRate = metrics?.sampleCount ? metrics.clippingEvents / metrics.sampleCount : 0;
+
+  const durationScore =
+    durationSec < 2
+      ? 38 + durationSec * 8
+      : durationSec < 8
+        ? 56 + durationSec * 4
+        : durationSec <= 45
+          ? 88
+          : durationSec <= 75
+            ? 78
+            : 68;
+  const ratioScore = metrics ? clamp(100 - Math.abs(speechRatio - 0.68) * 105, 35, 98) : 45;
+  const volumeScore = metrics
+    ? averageVolume < 0.012
+      ? 42
+      : averageVolume < 0.035
+        ? 62 + averageVolume * 500
+        : averageVolume < 0.18
+          ? 86
+          : 78
+    : 45;
+  const clippingPenalty = clippingRate > 0.04 ? 16 : clippingRate > 0.015 ? 8 : 0;
+  const pronunciation = clamp(volumeScore * 0.7 + durationScore * 0.3 - clippingPenalty, 30, 92);
+  const fluency = clamp(ratioScore * 0.65 + durationScore * 0.35, 30, 92);
+  const grammar = 62;
+  const expression = 62;
+  const interaction = clamp(durationScore * 0.75 + ratioScore * 0.25, 35, 92);
+  const scores: TurnScores = {
+    pronunciation: Math.round(pronunciation),
+    fluency: Math.round(fluency),
+    grammar,
+    expression,
+    interaction: Math.round(interaction),
+    overall: Math.round(pronunciation * 0.24 + fluency * 0.22 + grammar * 0.22 + expression * 0.18 + interaction * 0.14)
+  };
+
+  const issues: Issue[] = [];
+  if (!metrics) {
+    issues.push({
+      id: createId("issue"),
+      type: "pronunciation",
+      title: "录音反馈有限",
+      original: "audio metrics unavailable",
+      replacement: "try one more recording",
+      reason: "浏览器没有返回足够的音频采样数据，本轮只能保留录音并继续对话。",
+      severity: "medium"
+    });
+  } else {
+    if (durationSec < 2.5) {
+      issues.push({
+        id: createId("issue"),
+        type: "expression",
+        title: "回答过短",
+        original: `${durationSec.toFixed(1)}s`,
+        replacement: "8-20s answer",
+        reason: "真实口语训练建议至少给出一句观点和一个原因，太短会影响互动评分。",
+        severity: "medium"
+      });
+    }
+    if (speechRatio < 0.38) {
+      issues.push({
+        id: createId("issue"),
+        type: "pronunciation",
+        title: "有效说话占比偏低",
+        original: `${Math.round(speechRatio * 100)}% speaking`,
+        replacement: "speak closer to the mic",
+        reason: "录音中静音比例较高，可能是停顿过长、声音太小或麦克风距离过远。",
+        severity: "medium"
+      });
+    }
+    if (averageVolume < 0.015 || peakVolume < 0.06) {
+      issues.push({
+        id: createId("issue"),
+        type: "pronunciation",
+        title: "音量偏低",
+        original: "low volume",
+        replacement: "clearer volume",
+        reason: "请靠近麦克风或提高一点音量，系统才能更稳定地捕捉发音细节。",
+        severity: "medium"
+      });
+    }
+    if (clippingRate > 0.03) {
+      issues.push({
+        id: createId("issue"),
+        type: "pronunciation",
+        title: "音量过大或爆音",
+        original: "clipping peaks",
+        replacement: "steady volume",
+        reason: "录音峰值过高会造成爆音，建议离麦克风稍远并保持稳定音量。",
+        severity: "low"
+      });
+    }
+  }
+
+  issues.push({
+    id: createId("issue"),
+    type: "expression",
+    title: "无文本转写",
+    original: "Transcript unavailable",
+    replacement: "Audio-only feedback generated",
+    reason: input.recognitionUnavailable
+      ? "实时转写服务不可用，本轮已改用音频特征生成即时反馈；语法和表达纠错会在有文本时更精准。"
+      : "本轮没有识别到可用文本，系统已先给出语音层面的即时反馈并继续对话。",
+    severity: "low"
+  });
+
+  return {
+    id: createId("analysis"),
+    text: "Voice answer recorded. Transcript unavailable.",
+    wordCount: 0,
+    wpm: 0,
+    confidence: Math.round(pronunciation) / 100,
+    fillerCount: 0,
+    keywordHits: 0,
+    scores,
+    issues: issues.slice(0, 5),
+    correctedSentence: "Transcript unavailable. Audio-only feedback was generated from the recording.",
+    pronunciationTargets: input.scenario.keywords.slice(0, 3),
+    audioUrl: input.audioUrl,
+    audioMetrics: metrics ?? undefined,
     createdAt: Date.now()
   };
 }
