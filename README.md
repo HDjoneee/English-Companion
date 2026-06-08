@@ -103,3 +103,5 @@ MINIMAX_CHAT_MODEL=MiniMax-M3
 - `src/components/ui/*`：Shadcn 风格基础组件。
 - `src/components/Charts.tsx`：雷达图和趋势图。
 
+## 项目演示
+-链接：https://www.bilibili.com/video/BV1qrET6AEur/?vd_source=64c73d77045290a09bb36a407d71ca5f
