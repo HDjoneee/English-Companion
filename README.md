@@ -2,10 +2,6 @@
 
 React 18 + TypeScript + Tailwind CSS + Shadcn UI 风格组件实现的英语口语练习工具。支持场景对话、MiniMax 大模型追问、语音输入、稳定分片转写、用户录音回放、发音/流利度/语法/表达评分、纠错改写、课后总结、历史练习、收藏、错题本、文本和 PDF 导出。
 
-## Demo 演示
-
-<video src="demo/input.mp4" controls width="100%"></video>
-
 ## 运行
 
 ```powershell
