@@ -106,3 +106,4 @@ MINIMAX_CHAT_MODEL=MiniMax-M3
 - `src/lib/storage.ts`：历史、收藏、错题本本地存储。
 - `src/components/ui/*`：Shadcn 风格基础组件。
 - `src/components/Charts.tsx`：雷达图和趋势图。
+
